@@ -11,6 +11,7 @@ on:
       - 'src/**'
       - 'config/quality/**'
       - 'pom.xml'
+      - 'codecov.yml'
       - 'README.md'
       - 'STRUCTURE.md'
       - 'ARCHITECTURE.md'
@@ -25,6 +26,7 @@ on:
       - 'src/**'
       - 'config/quality/**'
       - 'pom.xml'
+      - 'codecov.yml'
       - 'README.md'
       - 'STRUCTURE.md'
       - 'ARCHITECTURE.md'
@@ -597,6 +599,18 @@ jobs:
           with summary_file.open('a', encoding='utf-8') as handle:
               handle.write('\n'.join(lines) + '\n')
           PYEOF
+
+      - name: Upload coverage to Codecov
+        if: always() && !cancelled() && hashFiles('target/jacoco-report/jacoco.xml') != ''
+        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
+        with:
+          files: target/jacoco-report/jacoco.xml
+          flags: bet-settler-java
+          name: bet-settler-java
+          token: ${{ secrets.CODECOV_TOKEN }}
+          disable_search: true
+          fail_ci_if_error: false
+          verbose: true
 
       - name: Upload coverage artifacts
         if: always() && !cancelled()

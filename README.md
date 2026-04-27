@@ -376,7 +376,6 @@ The fallback profile expects Kafka on `localhost:29092` unless overridden.
 
 Use one of these profiles:
 
-- `local`
 - `local-docker`
 - `local-fallback`
 - `test`
