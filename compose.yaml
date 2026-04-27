@@ -1,0 +1,125 @@
+name: bet-settler-group
+
+services:
+  bet-settler:
+    profiles: ["app"]
+    image: bet-settler:latest
+    pull_policy: never
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bet-settler
+    depends_on:
+      kafka:
+        condition: service_healthy
+      rocketmq-namesrv:
+        condition: service_started
+      rocketmq-broker:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: local-docker
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ROCKETMQ_NAME_SERVER: rocketmq-namesrv:9876
+      BET_SETTLER_H2_TCP_PORT: ${BET_SETTLER_H2_TCP_PORT:-9093}
+      BET_SETTLER_EVENT_OUTCOMES_TOPIC: ${BET_SETTLER_EVENT_OUTCOMES_TOPIC:-event-outcomes}
+      BET_SETTLER_BET_SETTLEMENTS_TOPIC: ${BET_SETTLER_BET_SETTLEMENTS_TOPIC:-bet-settlements}
+      BET_SETTLER_ROCKETMQ_PUBLISHER_MODE: rocketmq
+    ports:
+      - "8080:8080"
+      - "127.0.0.1:${BET_SETTLER_H2_TCP_PORT:-9093}:${BET_SETTLER_H2_TCP_PORT:-9093}"
+    restart: unless-stopped
+
+  kafka:
+    profiles: ["queues"]
+    image: confluentinc/cp-kafka:8.2.0
+    container_name: kafka
+    hostname: kafka
+    ports:
+      - "29092:29092"
+    environment:
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://0.0.0.0:29092,CONTROLLER://kafka:29093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/kafka/9092' || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  kafka-ui:
+    profiles: ["queues"]
+    image: provectuslabs/kafka-ui:v0.7.2
+    container_name: kafka-ui
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    ports:
+      - "8081:8080"
+    restart: unless-stopped
+
+  rocketmq-namesrv:
+    profiles: ["queues"]
+    image: apache/rocketmq:5.4.0
+    container_name: rocketmq-namesrv
+    command: sh mqnamesrv
+    ports:
+      - "9876:9876"
+    restart: unless-stopped
+
+  rocketmq-broker:
+    profiles: ["queues"]
+    image: apache/rocketmq:5.4.0
+    container_name: rocketmq-broker
+    depends_on:
+      rocketmq-namesrv:
+        condition: service_started
+    # Keep the Docker-first broker route by default so the app container can publish successfully.
+    command: sh mqbroker -n rocketmq-namesrv:9876 --enable-proxy
+    # IMPORTANT: if you run the app outside Docker with the `local-docker` profile (for example
+    # from the IDE), comment out the default command above, uncomment the volume below, and
+    # uncomment the host-first command below so RocketMQ advertises the host-reachable broker
+    # address from `config/rocketmq/broker.conf`.
+    # volumes:
+    #   - ./config/rocketmq/broker.conf:/home/rocketmq/rocketmq-5.4.0/conf/broker.conf:ro
+    # command: >-
+    #   sh mqbroker -n rocketmq-namesrv:9876
+    #   -c /home/rocketmq/rocketmq-5.4.0/conf/broker.conf
+    #   --enable-proxy
+    environment:
+      NAMESRV_ADDR: rocketmq-namesrv:9876
+    ports:
+      - "10909:10909"
+      - "10911:10911"
+      - "10912:10912"
+    restart: unless-stopped
+
+  rocketmq-dashboard:
+    profiles: ["queues"]
+    image: apacherocketmq/rocketmq-dashboard:2.1.0
+    container_name: rocketmq-dashboard
+    depends_on:
+      rocketmq-namesrv:
+        condition: service_started
+      rocketmq-broker:
+        condition: service_started
+    environment:
+      JAVA_OPTS: -Drocketmq.namesrv.addr=rocketmq-namesrv:9876 -Dserver.port=8082
+    ports:
+      - "8082:8082"
+    restart: unless-stopped

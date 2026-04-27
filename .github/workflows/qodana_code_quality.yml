@@ -1,0 +1,113 @@
+name: Qodana
+
+env:
+  # TODO(node24-migration): Remove once GitHub's default action runtime is Node 24.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'config/quality/**'
+      - 'pom.xml'
+      - 'README.md'
+      - 'STRUCTURE.md'
+      - 'ARCHITECTURE.md'
+      - 'QUALITY.md'
+      - 'HELP.md'
+      - 'utils/test-stats/**'
+      - '.github/workflows/qodana_code_quality.yml'
+      - 'qodana.yaml'
+      - '.qodana/baseline/**'
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'config/quality/**'
+      - 'pom.xml'
+      - 'README.md'
+      - 'STRUCTURE.md'
+      - 'ARCHITECTURE.md'
+      - 'QUALITY.md'
+      - 'HELP.md'
+      - 'utils/test-stats/**'
+      - '.github/workflows/qodana_code_quality.yml'
+      - 'qodana.yaml'
+      - '.qodana/baseline/**'
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  qodana:
+    name: Qodana
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+      - name: Set up JDK 25
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+          cache-dependency-path: pom.xml
+      - name: Make Maven wrapper executable
+        shell: bash
+        run: chmod +x ./mvnw
+      - name: Compile sources and tests for Qodana
+        shell: bash
+        run: ./mvnw -B -q test-compile
+      - name: Prepare Qodana arguments
+        id: qodana_args
+        shell: bash
+        env:
+          BASELINE_FILE: .qodana/baseline/project.sarif.json
+        run: |
+          args="--project-dir=."
+
+          if [[ -f "$BASELINE_FILE" ]]; then
+            echo "Using Qodana baseline: $BASELINE_FILE"
+            args="$args --baseline=$BASELINE_FILE"
+          else
+            echo "No Qodana baseline found at $BASELINE_FILE; running without a baseline."
+          fi
+
+          echo "args=$args" >> "$GITHUB_OUTPUT"
+      - name: Qodana Scan
+        uses: JetBrains/qodana-action@89eb4357efd2b52e639f3216e63edaf33b82622b # v2025.3.2
+        env:
+          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
+        with:
+          pr-mode: false
+          use-caches: true
+          post-pr-comment: false
+          use-annotations: true
+          # The Qodana action pre-zips results before uploading, which makes
+          # the artifact incompatible with download-artifact@v4+ (the Pages
+          # workflow gets a nested ZIP instead of extracted files).  We keep
+          # upload-result for full SARIF/log access under a distinct name and
+          # add an explicit upload-artifact step below for the HTML report.
+          upload-result: true
+          artifact-name: qodana-results
+          results-dir: ${{ runner.temp }}/qodana/results
+          push-fixes: 'none'
+          args: ${{ steps.qodana_args.outputs.args }}
+
+      # Explicit upload of the HTML report directory using upload-artifact@v4
+      # so that the Pages workflow's download-artifact@v8 receives extracted
+      # files (not the nested ZIP that the Qodana action produces).
+      - name: Upload Qodana HTML report
+        if: always() && !cancelled()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: qodana-report
+          path: ${{ runner.temp }}/qodana/results/report/
+          retention-days: 30
+          if-no-files-found: warn
