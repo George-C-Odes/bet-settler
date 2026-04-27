@@ -1,0 +1,15 @@
+suites=56
+tests=196
+failures=0
+errors=0
+skipped=0
+time=74.819
+line=99.8% (910/912)
+branch=98.1% (104/106)
+instruction=99.8% (3557/3565)
+method=100% (215/215)
+domain.application.line=99.3% (303/305)
+domain.application.branch=97.4% (37/38)
+infrastructure.line=100% (593/593)
+infrastructure.branch=98.4% (61/62)
+spotbugs=0

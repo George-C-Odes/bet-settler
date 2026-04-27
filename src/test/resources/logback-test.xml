@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/base.xml"/>
+
+    <logger name="org.hibernate.orm.jdbc.error" level="ERROR"/>
+    <logger name="org.hibernate.engine.jdbc.spi.SqlExceptionHelper" level="ERROR"/>
+    <logger name="io.github.georgecodes.betsettler.application.service.ProcessEventOutcomeService" level="OFF"/>
+    <logger name="io.github.georgecodes.betsettler.application.service.RetrySettlementDispatchService" level="OFF"/>
+    <logger name="io.github.georgecodes.betsettler.infrastructure.messaging.kafka.producer.KafkaEventOutcomePublisher" level="OFF"/>
+</configuration>
+

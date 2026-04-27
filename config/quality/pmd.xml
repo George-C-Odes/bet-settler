@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="Bet Settler PMD Rules" xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 ">
+    <description>
+        Curated PMD rules for local maintainability, complexity, naming, and documentation checks.
+    </description>
+
+    <rule ref="category/java/bestpractices.xml/UnusedLocalVariable"/>
+    <rule ref="category/java/bestpractices.xml/UnusedPrivateField"/>
+
+    <rule ref="category/java/codestyle.xml/ClassNamingConventions"/>
+    <rule ref="category/java/codestyle.xml/FieldNamingConventions"/>
+    <rule ref="category/java/codestyle.xml/FormalParameterNamingConventions"/>
+    <rule ref="category/java/codestyle.xml/LocalVariableNamingConventions"/>
+    <rule ref="category/java/codestyle.xml/MethodNamingConventions"/>
+    <rule ref="category/java/codestyle.xml/PackageCase"/>
+    <rule ref="category/java/codestyle.xml/UnnecessaryImport"/>
+    <rule ref="category/java/codestyle.xml/UnnecessaryFullyQualifiedName"/>
+
+    <rule ref="category/java/design.xml/CognitiveComplexity"/>
+    <rule ref="category/java/design.xml/CyclomaticComplexity"/>
+    <rule ref="category/java/design.xml/ExcessiveParameterList"/>
+    <rule ref="category/java/design.xml/NcssCount"/>
+    <rule ref="category/java/design.xml/NPathComplexity"/>
+
+    <rule ref="category/java/documentation.xml/CommentRequired"/>
+</ruleset>
+

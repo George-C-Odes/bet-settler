@@ -1,0 +1,26 @@
+spring:
+  autoconfigure:
+    exclude: []
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+betsettler:
+  h2:
+    tcp:
+      enabled: true
+      port: ${BET_SETTLER_H2_TCP_PORT:9093}
+  messaging:
+    rocketmq:
+      publisher-mode: rocketmq
+
+rocketmq:
+  name-server: ${ROCKETMQ_NAME_SERVER:localhost:9876}
+  producer:
+    group: ${ROCKETMQ_PRODUCER_GROUP:bet-settler-producer}
+

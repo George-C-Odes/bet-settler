@@ -1,0 +1,611 @@
+name: Java Coverage
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+    paths:
+      - 'src/**'
+      - 'config/quality/**'
+      - 'pom.xml'
+      - 'README.md'
+      - 'STRUCTURE.md'
+      - 'ARCHITECTURE.md'
+      - 'QUALITY.md'
+      - 'HELP.md'
+      - 'utils/test-stats/**'
+      - '.github/workflows/java_coverage.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'config/quality/**'
+      - 'pom.xml'
+      - 'README.md'
+      - 'STRUCTURE.md'
+      - 'ARCHITECTURE.md'
+      - 'QUALITY.md'
+      - 'HELP.md'
+      - 'utils/test-stats/**'
+      - '.github/workflows/java_coverage.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  BET_SETTLER_H2_TCP_PORT: '19093'
+
+jobs:
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+          cache-dependency-path: pom.xml
+
+      - name: Make Maven wrapper executable
+        run: chmod +x ./mvnw
+
+      - name: Run Maven verify with JaCoCo safeguards
+        id: verify
+        run: ./mvnw -q -B verify
+
+      - name: Generate test and coverage summary
+        if: always() && !cancelled()
+        env:
+          BUILD_OUTCOME: ${{ steps.verify.outcome }}
+        run: |
+          python3 << 'PYEOF'
+          import glob
+          import os
+          import pathlib
+          import re
+          import xml.etree.ElementTree as ET
+
+          root = pathlib.Path('.')
+          summary_file = pathlib.Path(os.environ['GITHUB_STEP_SUMMARY'])
+          build_outcome = os.environ['BUILD_OUTCOME']
+          pom_xml = root / 'pom.xml'
+
+          surefire_dir = root / 'target' / 'surefire-reports'
+          jacoco_candidates = [
+              root / 'target' / 'site' / 'jacoco' / 'jacoco.xml',
+              root / 'target' / 'jacoco-report' / 'jacoco.xml',
+          ]
+          jacoco_xml = next((path for path in jacoco_candidates if path.is_file()), None)
+
+          def strip_namespace(tag):
+              return tag.split('}', 1)[-1]
+
+          def child_nodes(node, name):
+              if node is None:
+                  return []
+              if name is None:
+                  return list(node)
+              return [child for child in list(node) if strip_namespace(child.tag) == name]
+
+          def child_text(node, name):
+              for child in child_nodes(node, name):
+                  return child.text.strip() if child.text else None
+              return None
+
+          def resolve_property(value, properties):
+              if value is None:
+                  return None
+
+              resolved = value.strip()
+              for property_name in re.findall(r'\$\{([^}]+)\}', resolved):
+                  property_value = properties.get(property_name)
+                  if property_value is None:
+                      return None
+                  resolved = resolved.replace('${' + property_name + '}', property_value)
+              return resolved
+
+          suites = 0
+          tests = 0
+          failures = 0
+          errors = 0
+          skipped = 0
+          total_time = 0.0
+          failed_test_cases = []
+
+          if surefire_dir.is_dir():
+              for report_path in glob.glob(str(surefire_dir / 'TEST-*.xml')):
+                  suites += 1
+                  suite = ET.parse(report_path).getroot()
+                  suite_name = suite.attrib.get('name', pathlib.Path(report_path).stem)
+                  tests += int(suite.attrib.get('tests', '0'))
+                  failures += int(suite.attrib.get('failures', '0'))
+                  errors += int(suite.attrib.get('errors', '0'))
+                  skipped += int(suite.attrib.get('skipped', '0'))
+                  total_time += float(suite.attrib.get('time', '0'))
+
+                  for testcase in suite.findall('testcase'):
+                      failure_node = testcase.find('failure')
+                      error_node = testcase.find('error')
+                      detail_node = failure_node if failure_node is not None else error_node
+                      if detail_node is None:
+                          continue
+
+                      raw_message = detail_node.attrib.get('message') or (detail_node.text or '').strip()
+                      message = ' '.join(raw_message.split()) if raw_message else 'No failure message captured.'
+                      failed_test_cases.append(
+                          {
+                              'suite': suite_name,
+                              'name': testcase.attrib.get('name', '<unknown>'),
+                              'time': testcase.attrib.get('time', '0'),
+                              'message': message.replace('|', '\\|'),
+                          }
+                      )
+
+          counters = {}
+          package_metrics = {}
+          class_metrics = {}
+          if jacoco_xml is not None:
+              jacoco_root = ET.parse(jacoco_xml).getroot()
+
+              def extract_counter_metrics(node):
+                  metrics = {}
+                  for counter in node.findall('counter'):
+                      counter_type = counter.attrib.get('type', '<unknown>')
+                      covered = int(counter.attrib.get('covered', '0'))
+                      missed = int(counter.attrib.get('missed', '0'))
+                      total = covered + missed
+                      metrics[counter_type] = {
+                          'covered': covered,
+                          'missed': missed,
+                          'total': total,
+                          'ratio': (covered / total) if total else 1.0,
+                      }
+                  return metrics
+
+              counters = extract_counter_metrics(jacoco_root)
+
+              for package in jacoco_root.findall('package'):
+                  package_name = package.attrib.get('name', '<unknown>')
+                  package_metrics[package_name] = extract_counter_metrics(package)
+
+                  for clazz in package.findall('class'):
+                      class_name = clazz.attrib.get('name', '<unknown>')
+                      class_metrics[class_name] = extract_counter_metrics(clazz)
+
+          def read_jacoco_safeguards():
+              if not pom_xml.is_file():
+                  return []
+
+              pom_root = ET.parse(pom_xml).getroot()
+              properties = {}
+              properties_node = next(
+                  (child for child in list(pom_root) if strip_namespace(child.tag) == 'properties'),
+                  None,
+              )
+              for property_node in child_nodes(properties_node, None):
+                  properties[strip_namespace(property_node.tag)] = (
+                      property_node.text.strip() if property_node.text else ''
+                  )
+
+              build_node = next(
+                  (child for child in list(pom_root) if strip_namespace(child.tag) == 'build'),
+                  None,
+              )
+              plugins_node = next(
+                  (child for child in list(build_node) if strip_namespace(child.tag) == 'plugins'),
+                  None,
+              )
+              safeguards = []
+
+              for plugin in child_nodes(plugins_node, 'plugin'):
+                  if child_text(plugin, 'artifactId') != 'jacoco-maven-plugin':
+                      continue
+
+                  executions_node = next(
+                      (child for child in list(plugin) if strip_namespace(child.tag) == 'executions'),
+                      None,
+                  )
+                  for execution in child_nodes(executions_node, 'execution'):
+                      goals_node = next(
+                          (child for child in list(execution) if strip_namespace(child.tag) == 'goals'),
+                          None,
+                      )
+                      goals = [goal.text.strip() for goal in child_nodes(goals_node, 'goal') if goal.text]
+                      if 'check' not in goals:
+                          continue
+
+                      configuration_node = next(
+                          (child for child in list(execution) if strip_namespace(child.tag) == 'configuration'),
+                          None,
+                      )
+                      rules_node = next(
+                          (child for child in list(configuration_node) if strip_namespace(child.tag) == 'rules'),
+                          None,
+                      )
+
+                      for rule_node in child_nodes(rules_node, 'rule'):
+                          element = (child_text(rule_node, 'element') or 'BUNDLE').upper()
+                          includes_node = next(
+                              (child for child in list(rule_node) if strip_namespace(child.tag) == 'includes'),
+                              None,
+                          )
+                          includes = [
+                              include.text.strip()
+                              for include in child_nodes(includes_node, 'include')
+                              if include.text
+                          ]
+                          limits_node = next(
+                              (child for child in list(rule_node) if strip_namespace(child.tag) == 'limits'),
+                              None,
+                          )
+                          limits = []
+                          for limit_node in child_nodes(limits_node, 'limit'):
+                              if child_text(limit_node, 'value') != 'COVEREDRATIO':
+                                  continue
+
+                              minimum_value = resolve_property(child_text(limit_node, 'minimum'), properties)
+                              if minimum_value is None:
+                                  continue
+
+                              limits.append(
+                                  {
+                                      'counter': (child_text(limit_node, 'counter') or 'LINE').upper(),
+                                      'minimum_value': minimum_value,
+                                  }
+                              )
+
+                          if limits:
+                              safeguards.append(
+                                  {
+                                      'element': element,
+                                      'includes': includes,
+                                      'limits': limits,
+                                  }
+                              )
+
+              return safeguards
+
+          def format_percent(minimum):
+              if minimum is None:
+                  return 'n/a'
+              return f"{float(minimum) * 100:.0f}%"
+
+          def format_ratio(ratio):
+              return f"{ratio * 100:.1f}%"
+
+          def format_counter(counter_type):
+              metrics = counters.get(
+                  counter_type,
+                  {'covered': 0, 'total': 0, 'ratio': 1.0},
+              )
+              percent = metrics['ratio'] * 100.0
+              return f"{percent:.1f}%", f"{metrics['covered']} / {metrics['total']}"
+
+          def display_name(name):
+              return name.replace('/', '.')
+
+          def metrics_for_target(element, target_name):
+              lookup_name = target_name.replace('.', '/')
+              if element == 'PACKAGE':
+                  return package_metrics.get(lookup_name)
+              if element == 'CLASS':
+                  return class_metrics.get(lookup_name)
+              return None
+
+          def label_for_rule(element, counter_type, includes):
+              counter_label = counter_type.lower()
+              if element == 'BUNDLE':
+                  return f"Bundle {counter_label}"
+              if not includes:
+                  return f"{element.title()} {counter_label}"
+
+              scope = includes[0]
+              if len(includes) > 1:
+                  scope = f"{scope} (+{len(includes) - 1} more)"
+              return f"{element.title()} {counter_label} — {scope}"
+
+          def evaluate_safeguards():
+              if jacoco_xml is None:
+                  return {
+                      'all_cleared': False,
+                      'failures': ['JaCoCo XML report missing'],
+                      'checks': [],
+                  }
+
+              checks = []
+              failures = []
+
+              for safeguard in read_jacoco_safeguards():
+                  element = safeguard['element']
+                  for limit in safeguard['limits']:
+                      counter_type = limit['counter']
+                      minimum_value = limit['minimum_value']
+                      threshold = float(minimum_value)
+                      label = label_for_rule(element, counter_type, safeguard['includes'])
+
+                      if element == 'BUNDLE':
+                          actual_ratio = counters.get(counter_type, {'ratio': 1.0})['ratio']
+                          passed = actual_ratio >= threshold
+                          if not passed:
+                              failures.append(f"{label.lower()} < {format_percent(minimum_value)}")
+                          checks.append(
+                              {
+                                  'label': label,
+                                  'element': element,
+                                  'passed': passed,
+                                  'actual_ratio': actual_ratio,
+                                  'minimum_value': minimum_value,
+                                  'failing_targets': [],
+                                  'worst_target': None,
+                                  'target_count': 1,
+                              }
+                          )
+                          continue
+
+                      target_names = safeguard['includes']
+                      if not target_names:
+                          target_names = sorted(package_metrics if element == 'PACKAGE' else class_metrics)
+
+                      evaluated_targets = []
+                      for target_name in target_names:
+                          target_metrics = metrics_for_target(element, target_name)
+                          actual_ratio = (
+                              target_metrics.get(counter_type, {'ratio': 1.0})['ratio']
+                              if target_metrics is not None
+                              else 0.0
+                          )
+                          evaluated_targets.append(
+                              {
+                                  'name': target_name,
+                                  'actual_ratio': actual_ratio,
+                                  'missing': target_metrics is None,
+                              }
+                          )
+
+                      worst_target = min(
+                          evaluated_targets,
+                          key=lambda item: item['actual_ratio'],
+                          default=None,
+                      )
+                      failing_targets = [
+                          target
+                          for target in sorted(
+                              evaluated_targets,
+                              key=lambda item: item['actual_ratio'],
+                          )
+                          if target['missing'] or target['actual_ratio'] < threshold
+                      ]
+                      passed = not failing_targets
+                      if not passed:
+                          failures.append(f"{label.lower()} < {format_percent(minimum_value)}")
+
+                      checks.append(
+                          {
+                              'label': label,
+                              'element': element,
+                              'passed': passed,
+                              'actual_ratio': worst_target['actual_ratio'] if worst_target is not None else 1.0,
+                              'minimum_value': minimum_value,
+                              'failing_targets': failing_targets,
+                              'worst_target': worst_target,
+                              'target_count': len(evaluated_targets),
+                          }
+                      )
+
+              return {
+                  'all_cleared': not failures,
+                  'failures': failures,
+                  'checks': checks,
+              }
+
+          threshold_report = evaluate_safeguards()
+          thresholds_cleared = threshold_report['all_cleared']
+          threshold_failures = threshold_report['failures']
+
+          build_badge = {
+              'success': '✅ Passed',
+              'failure': '❌ Failed',
+              'cancelled': '⚪ Cancelled',
+          }.get(build_outcome, f"⚠️ {build_outcome.title()}")
+
+          lines = [
+              '## Java coverage summary',
+              '',
+              f"**Workflow result:** {build_badge}",
+              '',
+              '> Maven `verify` is the gate in this workflow. For this repository that includes Spotless, PMD, SpotBugs, Javadoc, tests, and JaCoCo safeguards from `pom.xml`.',
+              '',
+          ]
+
+          if jacoco_xml is not None:
+              line_percent, line_precise = format_counter('LINE')
+              branch_percent, branch_precise = format_counter('BRANCH')
+              instruction_percent, instruction_precise = format_counter('INSTRUCTION')
+              method_percent, method_precise = format_counter('METHOD')
+
+              threshold_status = (
+                  '✅ All configured JaCoCo safeguards were cleared.'
+                  if thresholds_cleared
+                  else '⚠️ One or more configured JaCoCo safeguards were not cleared.'
+              )
+
+              lines.extend(
+                  [
+                      '### ✨ At a glance',
+                      '',
+                      f'- **Test suites:** **{suites}**',
+                      f'- **Test cases:** **{tests}**',
+                      f'- **Failures / errors / skipped:** **{failures} / {errors} / {skipped}**',
+                      f'- **Total recorded test time:** **{total_time:.3f} s**',
+                      f'- **Line coverage:** **{line_percent}** (**{line_precise}**)',
+                      f'- **Branch coverage:** **{branch_percent}** (**{branch_precise}**)',
+                      f'- **Instruction coverage:** **{instruction_percent}** (**{instruction_precise}**)',
+                      f'- **Method coverage:** **{method_percent}** (**{method_precise}**)',
+                      '',
+                      f'**Threshold status:** {threshold_status}',
+                      '',
+                  ]
+              )
+
+              lines.append('### 🛡️ Safeguard status')
+              lines.append('')
+              for check in threshold_report['checks']:
+                  status_icon = '✅' if check['passed'] else '❌'
+                  scope_suffix = (
+                      f" across {check['target_count']} target(s)"
+                      if check['element'] in {'PACKAGE', 'CLASS'}
+                      else ''
+                  )
+                  lines.append(
+                      f"- {status_icon} **{check['label']}** — actual **{format_ratio(check['actual_ratio'])}** vs threshold **{format_percent(check['minimum_value'])}**{scope_suffix}"
+                  )
+              lines.append('')
+
+              if not thresholds_cleared and threshold_failures:
+                  lines.append(f"> Missing safeguard(s): {', '.join(threshold_failures)}")
+                  lines.append('')
+
+                  for check in threshold_report['checks']:
+                      if not check['failing_targets'] or check['worst_target'] is None:
+                          continue
+                      lines.append(
+                          f"> Worst target for **{check['label']}**: `{display_name(check['worst_target']['name'])}` at **{format_ratio(check['worst_target']['actual_ratio'])}**"
+                      )
+                  lines.append('')
+
+          if suites:
+              lines.extend(
+                  [
+                      '### 🧪 Test execution',
+                      '',
+                      '| Metric | Value |',
+                      '|---|---:|',
+                      f'| Test suites | **{suites}** |',
+                      f'| Test cases | **{tests}** |',
+                      f'| Failures / errors / skipped | **{failures} / {errors} / {skipped}** |',
+                      f'| Total recorded test time | **{total_time:.3f} s** |',
+                      '',
+                  ]
+              )
+          else:
+              lines.extend(['### 🧪 Test execution', '', '> Surefire reports were not generated.', ''])
+
+          if failed_test_cases:
+              lines.extend(
+                  [
+                      '### ❌ Failing tests',
+                      '',
+                      '| Test case | Time | Failure detail |',
+                      '|---|---:|---|',
+                  ]
+              )
+              for failed_test in failed_test_cases[:10]:
+                  lines.append(
+                      f"| `{failed_test['suite']}.{failed_test['name']}` | **{failed_test['time']} s** | {failed_test['message']} |"
+                  )
+              if len(failed_test_cases) > 10:
+                  lines.append(
+                      f"| _Additional failing tests_ |  | {len(failed_test_cases) - 10} more failure(s) omitted for brevity. |"
+                  )
+              lines.append('')
+
+          if jacoco_xml is not None:
+              lines.extend(
+                  [
+                      '### 📈 Coverage metrics',
+                      '',
+                      '| Coverage metric | Coverage | Precise values |',
+                      '|---|---:|---:|',
+                      f'| Line coverage | **{line_percent}** | **{line_precise}** |',
+                      f'| Branch coverage | **{branch_percent}** | **{branch_precise}** |',
+                      f'| Instruction coverage | **{instruction_percent}** | **{instruction_precise}** |',
+                      f'| Method coverage | **{method_percent}** | **{method_precise}** |',
+                      '',
+                      '| Active JaCoCo safeguard | Actual | Threshold |',
+                      '|---|---:|---:|',
+                      '',
+                      f'> Source: `{jacoco_xml.as_posix()}`',
+                      '',
+                  ]
+              )
+
+              if threshold_report['checks']:
+                  for check in threshold_report['checks']:
+                      lines.append(
+                          f"| {check['label']} | **{format_ratio(check['actual_ratio'])}** | **{format_percent(check['minimum_value'])}** |"
+                      )
+                  lines.append('')
+
+              if any(check['failing_targets'] for check in threshold_report['checks']):
+                  lines.extend(
+                      [
+                          '<details>',
+                          '<summary>Failing safeguard target diagnostics</summary>',
+                          '',
+                      ]
+                  )
+
+                  for check in threshold_report['checks']:
+                      if not check['failing_targets']:
+                          continue
+
+                      lines.extend(
+                          [
+                              f"**{check['label']}** — failing targets: {len(check['failing_targets'])}",
+                              '',
+                              '| Target | Coverage | Threshold | Status |',
+                              '|---|---:|---:|---|',
+                          ]
+                      )
+                      for target in check['failing_targets'][:10]:
+                          status = 'missing from JaCoCo XML' if target['missing'] else 'below threshold'
+                          lines.append(
+                              f"| `{display_name(target['name'])}` | **{format_ratio(target['actual_ratio'])}** | **{format_percent(check['minimum_value'])}** | {status} |"
+                          )
+                      if len(check['failing_targets']) > 10:
+                          lines.append(
+                              f"| _Additional failing targets_ |  |  | {len(check['failing_targets']) - 10} more target(s) omitted for brevity. |"
+                          )
+                      lines.append('')
+
+                  lines.extend(['</details>', ''])
+          else:
+              lines.extend(['### 📈 Coverage metrics', '', '> JaCoCo XML report was not generated.', ''])
+
+          if build_outcome != 'success':
+              lines.extend(
+                  [
+                      '### 💡 Failure hint',
+                      '',
+                      '> Check the failing Maven `verify` step first. In this workflow the most common causes are test failures, Spotless/PMD/SpotBugs/Javadoc failures, or JaCoCo safeguards not meeting the configured thresholds shown above.',
+                  ]
+              )
+
+          with summary_file.open('a', encoding='utf-8') as handle:
+              handle.write('\n'.join(lines) + '\n')
+          PYEOF
+
+      - name: Upload coverage artifacts
+        if: always() && !cancelled()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: java-coverage-reports
+          path: |
+            target/jacoco-report/
+            target/site/jacoco/
+            target/surefire-reports/
+          retention-days: 14
+          if-no-files-found: warn

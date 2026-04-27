@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="BetSettler [local-docker]" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <option name="ACTIVE_PROFILES" value="local-docker" />
+    <module name="bet-settler" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="io.github.georgecodes.betsettler.BetSettlerApplication" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

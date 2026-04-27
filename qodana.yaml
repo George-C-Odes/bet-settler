@@ -1,0 +1,102 @@
+#-------------------------------------------------------------------------------#
+#               Qodana analysis is configured by qodana.yaml file               #
+#             https://www.jetbrains.com/help/qodana/qodana-yaml.html            #
+#-------------------------------------------------------------------------------#
+
+#################################################################################
+#              WARNING: Do not store sensitive information in this file,        #
+#               as its contents will be included in the Qodana report.          #
+#################################################################################
+version: "1.0"
+
+# Specify inspection profile for code analysis.
+# The recommended profile enables a broader JVM inspection set than qodana.starter,
+# which helps this repository catch real Java issues instead of mostly formatting noise.
+profile:
+  name: qodana.recommended
+  inspections:
+    - inspection: LocalVariableNamingConvention
+      options:
+        m_maxLength: 29
+    - inspection: ParameterNamingConvention
+      options:
+        m_maxLength: 36
+#    - inspection: DuplicateStringLiteralInspection
+#      options:
+#        MIN_STRING_LENGTH: 24
+#        IGNORE_PROPERTY_KEYS: true
+    - inspection: UnnecessaryFullyQualifiedName
+      enabled: true
+      severity: ERROR
+
+# Enable extra JetBrains inspections that complement the Maven-enforced PMD baseline.
+# PMD owns the build-breaking baseline for naming conventions and public API comment presence.
+# Qodana adds richer IDE / CI feedback for finer-grained naming and missing Javadoc issues.
+# An optional reviewed baseline may be committed at
+# `.qodana/baseline/project.sarif.json`; the GitHub Actions workflow only applies
+# it when that file exists.
+include:
+  - name: MissingJavadoc
+  - name: PackageNamingConvention
+  - name: ClassNamingConvention
+  - name: MethodNamingConvention
+  - name: FieldNamingConvention
+  - name: ParameterNamingConvention
+  - name: LocalVariableNamingConvention
+  - name: TypeParameterNamingConvention
+  - name: LoggingPlaceholderCountMatchesArgumentCount
+  - name: StringConcatenationArgumentToLogCall
+  - name: CallToPrintStackTrace
+  - name: UseOfSystemOutOrSystemErr
+  - name: OptionalGetWithoutIsPresent
+  - name: BigDecimalMethodWithoutRoundingCalled
+  - name: NullableProblems
+#  - name: DuplicateStringLiteralInspection
+  - name: ClassCanBeRecord
+  - name: UnnecessaryFullyQualifiedName
+    paths:
+      - src/main/java
+      - src/test/java
+
+# Keep the scan focused on Java / Maven sources and avoid repository-level noise.
+exclude:
+  - name: All
+    paths:
+      - .github
+      - .qodana
+      - .run
+      - config
+      - dev-data
+      - k8s
+      - results
+      - src/main/docker
+      - target
+      - utils
+  - name: MissingJavadoc
+    paths:
+      - src/test/java
+
+projectJDK: "25" #(Applied in CI/CD pipeline)
+
+# Execute shell command before Qodana execution (Applied in CI/CD pipeline)
+# bootstrap: sh ./prepare-qodana.sh
+
+# Install IDE plugins before Qodana execution (Applied in CI/CD pipeline)
+# plugins:
+#  - id: <plugin.id> #(plugin id can be found at https://plugins.jetbrains.com)
+
+# Quality gate. Will fail the CI/CD pipeline if any condition is not met.
+# severityThresholds configures maximum thresholds for different problem severities.
+# Code Coverage thresholds are available in Ultimate and Ultimate Plus plans.
+failureConditions:
+  severityThresholds:
+    # Fail the CI on critical, high and moderate findings to keep the gate strict.
+    critical: 0
+    high: 0
+    moderate: 0
+
+# Qodana supports other languages, for example, Python, JavaScript, TypeScript, Go, C#, PHP.
+# For all supported languages see https://www.jetbrains.com/help/qodana/linters.html
+# Keep the JVM linter pinned here so local runs and the GitHub Actions workflow
+# resolve the same analyzer image for this repository.
+linter: jetbrains/qodana-jvm-community:2025.3

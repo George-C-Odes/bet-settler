@@ -1,0 +1,22 @@
+spring:
+  autoconfigure:
+    exclude:
+      - org.apache.rocketmq.spring.autoconfigure.RocketMQAutoConfiguration
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+betsettler:
+  h2:
+    tcp:
+      enabled: true
+      port: ${BET_SETTLER_H2_TCP_PORT:9093}
+  messaging:
+    rocketmq:
+      publisher-mode: logging
+
