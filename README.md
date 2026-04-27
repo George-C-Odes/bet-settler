@@ -1,3 +1,6 @@
+[![Java Coverage](https://github.com/George-C-Odes/bet-settler/actions/workflows/java_coverage.yml/badge.svg)](https://github.com/George-C-Odes/bet-settler/actions/workflows/java_coverage.yml)
+[![Qodana](https://github.com/George-C-Odes/bet-settler/actions/workflows/qodana_code_quality.yml/badge.svg)](https://github.com/George-C-Odes/bet-settler/actions/workflows/qodana_code_quality.yml)
+
 # bet-settler
 
 `bet-settler` is a Spring Boot backend service that simulates sports betting event-outcome handling and bet-settlement dispatch.
