@@ -1,5 +1,6 @@
-[![Java Coverage](https://github.com/George-C-Odes/bet-settler/actions/workflows/java_coverage.yml/badge.svg)](https://github.com/George-C-Odes/bet-settler/actions/workflows/java_coverage.yml)
 [![Qodana](https://github.com/George-C-Odes/bet-settler/actions/workflows/qodana_code_quality.yml/badge.svg)](https://github.com/George-C-Odes/bet-settler/actions/workflows/qodana_code_quality.yml)
+[![Java Coverage](https://github.com/George-C-Odes/bet-settler/actions/workflows/java_coverage.yml/badge.svg)](https://github.com/George-C-Odes/bet-settler/actions/workflows/java_coverage.yml)
+[![codecov](https://codecov.io/github/George-C-Odes/bet-settler/graph/badge.svg?token=7MBHXDDRDS)](https://codecov.io/github/George-C-Odes/bet-settler)
 
 # bet-settler
 
