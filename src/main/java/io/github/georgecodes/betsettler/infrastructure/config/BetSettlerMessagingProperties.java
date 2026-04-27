@@ -50,11 +50,11 @@ public record BetSettlerMessagingProperties(@Valid Kafka kafka, @Valid RocketMq 
      *     API publish request is failed
      */
     public Kafka {
-      eventOutcomesTopic = normaliseTopic(eventOutcomesTopic);
-      publishAckTimeout = normalisePublishAckTimeout(publishAckTimeout);
+      eventOutcomesTopic = normalizeTopic(eventOutcomesTopic);
+      publishAckTimeout = normalizePublishAckTimeout(publishAckTimeout);
     }
 
-    private static String normaliseTopic(String eventOutcomesTopic) {
+    private static String normalizeTopic(String eventOutcomesTopic) {
       if (eventOutcomesTopic == null) {
         return DEFAULT_EVENT_OUTCOMES_TOPIC;
       }
@@ -65,7 +65,7 @@ public record BetSettlerMessagingProperties(@Valid Kafka kafka, @Valid RocketMq 
       return trimmedTopic;
     }
 
-    private static Duration normalisePublishAckTimeout(Duration publishAckTimeout) {
+    private static Duration normalizePublishAckTimeout(Duration publishAckTimeout) {
       if (publishAckTimeout == null) {
         return DEFAULT_PUBLISH_ACK_TIMEOUT;
       }
@@ -98,11 +98,11 @@ public record BetSettlerMessagingProperties(@Valid Kafka kafka, @Valid RocketMq 
      * @param publisherMode settlement publisher implementation mode
      */
     public RocketMq {
-      betSettlementsTopic = normaliseTopic(betSettlementsTopic);
+      betSettlementsTopic = normalizeTopic(betSettlementsTopic);
       publisherMode = publisherMode == null ? DEFAULT_PUBLISHER_MODE : publisherMode;
     }
 
-    private static String normaliseTopic(String betSettlementsTopic) {
+    private static String normalizeTopic(String betSettlementsTopic) {
       if (betSettlementsTopic == null) {
         return DEFAULT_BET_SETTLEMENTS_TOPIC;
       }

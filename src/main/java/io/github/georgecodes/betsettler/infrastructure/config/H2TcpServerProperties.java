@@ -21,10 +21,10 @@ public record H2TcpServerProperties(boolean enabled, int port) {
    * @param port port exposed by the H2 TCP server
    */
   public H2TcpServerProperties {
-    port = normalisePort(port);
+    port = normalizePort(port);
   }
 
-  private static int normalisePort(int port) {
+  private static int normalizePort(int port) {
     if (port == 0) {
       return DEFAULT_PORT;
     }

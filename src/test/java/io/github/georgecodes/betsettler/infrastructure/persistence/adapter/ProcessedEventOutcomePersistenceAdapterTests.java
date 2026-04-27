@@ -1,6 +1,7 @@
 package io.github.georgecodes.betsettler.infrastructure.persistence.adapter;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.assertArg;
 import static org.mockito.Mockito.never;
@@ -49,16 +50,14 @@ class ProcessedEventOutcomePersistenceAdapterTests {
   }
 
   @Test
-  void recordProcessedIfAbsentReturnsFalseWhenInsertReportsExistingEvent() {
-    EventOutcome eventOutcome = new EventOutcome("EVT-9002", "Team Q vs Team R", "TEAM-Q");
-    when(processedEventOutcomeRepository.insertProcessedEventOutcome(any(), any(), any(), any()))
-        .thenThrow(new DataIntegrityViolationException("duplicate event outcome"));
+  void recordProcessedIfAbsentRejectsNullEventOutcome() {
+    assertThatThrownBy(() -> adapter.recordProcessedIfAbsent(null))
+        .isInstanceOf(NullPointerException.class)
+        .hasMessage("eventOutcome must not be null");
 
-    boolean recorded = adapter.recordProcessedIfAbsent(eventOutcome);
-
-    assertThat(recorded).isFalse();
     verify(processedEventOutcomeRepository, never()).existsById(any());
-    verify(processedEventOutcomeRepository).insertProcessedEventOutcome(any(), any(), any(), any());
+    verify(processedEventOutcomeRepository, never())
+        .insertProcessedEventOutcome(any(), any(), any(), any());
   }
 
   @Test

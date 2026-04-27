@@ -75,6 +75,17 @@ class RestDtoValidationTests {
                     List.of()))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("status must be a valid HTTP status code");
+    assertThatThrownBy(
+            () ->
+                new ErrorResponse(
+                    Instant.parse("2026-04-23T10:15:30Z"),
+                    600,
+                    "Bad Request",
+                    "Request validation failed.",
+                    "/api/v1/event-outcomes",
+                    List.of()))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("status must be a valid HTTP status code");
   }
 
   @Test

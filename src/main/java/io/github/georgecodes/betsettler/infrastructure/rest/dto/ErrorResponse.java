@@ -37,7 +37,7 @@ public record ErrorResponse(
    */
   public ErrorResponse {
     Objects.requireNonNull(timestamp, "timestamp must not be null");
-    if (status < 100) {
+    if (status < 100 || status > 599) {
       throw new IllegalArgumentException("status must be a valid HTTP status code");
     }
     error = requireNonBlank(error, "error");

@@ -1,4 +1,4 @@
-# Keep GitHub Actions, Quarkus and java packages up to date.
+# Keep GitHub Actions dependencies up to date.
 # https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
 version: 2
 updates:
