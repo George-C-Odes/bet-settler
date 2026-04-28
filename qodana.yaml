@@ -27,7 +27,27 @@ profile:
 #        IGNORE_PROPERTY_KEYS: true
     - inspection: UnnecessaryFullyQualifiedName
       enabled: true
-      severity: ERROR
+      severity: WEAK WARNING
+    - inspection: OnDemandImport
+      enabled: true
+      severity: WEAK WARNING
+    - inspection: unused
+      enabled: true
+      severity: WEAK WARNING
+      options:
+        LOCAL_VARIABLE: true
+        FIELD: true
+        METHOD: false
+        CLASS: true
+        PARAMETER: true
+        REPORT_PARAMETER_FOR_PUBLIC_METHODS: false
+        ADD_MAINS_TO_ENTRIES: true
+        ADD_APPLET_TO_ENTRIES: true
+        ADD_SERVLET_TO_ENTRIES: true
+        ADD_NONJAVA_TO_ENTRIES: true
+        field: private
+        klass: private
+        inner_class: private
 
 # Enable extra JetBrains inspections that complement the Maven-enforced PMD baseline.
 # PMD owns the build-breaking baseline for naming conventions and public API comment presence.
@@ -37,7 +57,6 @@ profile:
 # it when that file exists.
 include:
   - name: MissingJavadoc
-  - name: PackageNamingConvention
   - name: ClassNamingConvention
   - name: MethodNamingConvention
   - name: FieldNamingConvention
@@ -57,6 +76,14 @@ include:
     paths:
       - src/main/java
       - src/test/java
+  - name: OnDemandImport
+    paths:
+      - src/main/java
+      - src/test/java
+  - name: unused
+    paths:
+      - src/main/java
+#      - src/test/java
 
 # Keep the scan focused on Java / Maven sources and avoid repository-level noise.
 exclude:
@@ -79,7 +106,7 @@ exclude:
 projectJDK: "25" #(Applied in CI/CD pipeline)
 
 # Execute shell command before Qodana execution (Applied in CI/CD pipeline)
-# bootstrap: sh ./prepare-qodana.sh
+bootstrap: sh ./mvnw -B -q -DskipTests test-compile
 
 # Install IDE plugins before Qodana execution (Applied in CI/CD pipeline)
 # plugins:

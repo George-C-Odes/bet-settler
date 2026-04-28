@@ -70,7 +70,8 @@ jobs:
         env:
           BASELINE_FILE: .qodana/baseline/project.sarif.json
         run: |
-          args="--project-dir=."
+          qodana_image="jetbrains/qodana-jvm-community:2026.1"
+          args="--project-dir=. --image=$qodana_image"
 
           if [[ -f "$BASELINE_FILE" ]]; then
             echo "Using Qodana baseline: $BASELINE_FILE"
