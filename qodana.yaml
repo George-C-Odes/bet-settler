@@ -107,10 +107,7 @@ exclude:
 projectJDK: "25" #(Applied in CI/CD pipeline)
 
 # Execute shell command before Qodana execution (Applied in CI/CD pipeline)
-# Compile inside the Qodana container as well so Maven import and annotation
-# processing match the actual analyzer runtime instead of relying only on the
-# host runner's pre-built workspace state.
-bootstrap: sh ./mvnw -B -q -DskipTests test-compile
+# bootstrap: sh ./prepare-qodana.sh
 
 # Install IDE plugins before Qodana execution (Applied in CI/CD pipeline)
 # plugins:
