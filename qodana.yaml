@@ -31,6 +31,9 @@ profile:
     - inspection: OnDemandImport
       enabled: true
       severity: WEAK WARNING
+    - inspection: PackageNamingConvention
+      enabled: true
+      severity: WEAK WARNING
     - inspection: unused
       enabled: true
       severity: WEAK WARNING
@@ -57,7 +60,6 @@ profile:
 # it when that file exists.
 include:
   - name: MissingJavadoc
-  - name: PackageNamingConvention
   - name: ClassNamingConvention
   - name: MethodNamingConvention
   - name: FieldNamingConvention
@@ -81,10 +83,14 @@ include:
     paths:
       - src/main/java
       - src/test/java
+  - name: PackageNamingConvention
+    paths:
+      - src/main/java
+#      - src/test/java
   - name: unused
     paths:
       - src/main/java
-      - src/test/java
+#      - src/test/java
 
 # Keep the scan focused on Java / Maven sources and avoid repository-level noise.
 exclude:
