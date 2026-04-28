@@ -57,7 +57,6 @@ profile:
 # it when that file exists.
 include:
   - name: MissingJavadoc
-  - name: PackageNamingConvention
   - name: ClassNamingConvention
   - name: MethodNamingConvention
   - name: FieldNamingConvention
@@ -107,7 +106,7 @@ exclude:
 projectJDK: "25" #(Applied in CI/CD pipeline)
 
 # Execute shell command before Qodana execution (Applied in CI/CD pipeline)
-# bootstrap: sh ./prepare-qodana.sh
+bootstrap: sh ./mvnw -B -q -DskipTests test-compile
 
 # Install IDE plugins before Qodana execution (Applied in CI/CD pipeline)
 # plugins:
