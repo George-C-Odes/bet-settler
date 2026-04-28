@@ -58,7 +58,6 @@
         <exec-maven-plugin.version>3.6.3</exec-maven-plugin.version>
     </properties>
     <dependencies>
-        <!--suppress VulnerableLibrariesLocal -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
@@ -99,6 +98,7 @@
             <version>${lombok.version}</version>
             <optional>true</optional>
         </dependency>
+        <!--suppress VulnerableLibrariesLocal -->
         <dependency>
             <groupId>org.apache.rocketmq</groupId>
             <artifactId>rocketmq-spring-boot-starter</artifactId>
