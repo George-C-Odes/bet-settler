@@ -180,6 +180,8 @@ Framework-facing adapters and configuration.
 - `entity.*` - JPA mappings for `bet`, `processed_event_outcome`, and `settlement_audit`
 - `repository.*` - Spring Data repositories backing the adapters
 
+For the detailed assessment of database hot paths, throughput bottlenecks, and horizontal-scaling implications behind this persistence area, see [`DB_SCALING_REVIEW.md`](DB_SCALING_REVIEW.md).
+
 #### `infrastructure.config`
 
 - `MessagingConfiguration` - chooses the intentional logging publisher by default and requires RocketMQ transport wiring for explicit RocketMQ mode
@@ -272,4 +274,5 @@ Framework-facing adapters and configuration.
 
 - See [`README.md`](README.md) for the practical entry guide.
 - See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the end-to-end flow and diagrams.
+- See [`DB_SCALING_REVIEW.md`](DB_SCALING_REVIEW.md) for the detailed database-load, throughput, and horizontal-scaling review.
 - See [`QUALITY.md`](QUALITY.md) for build gates, CI workflows, and current verification stats.

@@ -180,6 +180,8 @@ The base schema also adds lightweight integrity checks for positive bet amounts 
 
 The current codebase also uses that audit trail for a modest manual recovery path: local/test operators can trigger replay of `PENDING` and `FAILED` rows without reconstructing settlements from scratch.
 
+For a detailed review of how this persistence model behaves under higher database load and multi-instance scaling pressure, see [`DB_SCALING_REVIEW.md`](DB_SCALING_REVIEW.md).
+
 ## Persistence hot-path notes
 
 - `findByEventIdOrderByBetIdAsc` is backed by a composite `bet(event_id, bet_id)` index in the base schema so the main filter-and-order query matches the database layout more closely.
@@ -287,4 +289,5 @@ These are deliberate and match the current codebase state.
 
 - [`README.md`](README.md) - practical run and use guide
 - [`STRUCTURE.md`](STRUCTURE.md) - package ownership and module map
+- [`DB_SCALING_REVIEW.md`](DB_SCALING_REVIEW.md) - detailed database-load, throughput, and horizontal-scaling review
 - [`QUALITY.md`](QUALITY.md) - Maven gates, CI workflows, and current stats
