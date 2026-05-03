@@ -21,6 +21,7 @@ Start here for practical usage, then follow the focused docs as needed:
 
 - [`STRUCTURE.md`](STRUCTURE.md) - package layout, layer ownership, and key adapters
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) - end-to-end flow, transactional model, and Mermaid diagrams
+- [`DB_SCALING_REVIEW.md`](DB_SCALING_REVIEW.md) - detailed database-load, throughput, and horizontal-scaling review
 - [`QUALITY.md`](QUALITY.md) - Maven quality gates, GitHub Actions workflows, and current test/coverage stats
 - [`HELP.md`](HELP.md) - minimal supplementary Spring Boot reference links
 
@@ -158,7 +159,7 @@ What you get in this mode:
 
 This profile intentionally requests RocketMQ mode, so the application fails fast during startup if the RocketMQ transport bean cannot be created.
 
-> Important: the default `rocketmq-broker` command in `compose.yaml` is intentionally Docker-first so the `bet-settler` app container can publish through RocketMQ. If you want to run the app outside Docker with the `local-docker` profile (for example from IntelliJ), comment out that default broker command and switch to the commented `broker.conf`-based broker command and volume mount in `compose.yaml`, then recreate the broker container.
+> Important: the default `rocketmq-broker` command in `compose.yaml` is intentionally Docker-first so the `bet-settler` app container can publish through RocketMQ. If you want to run the app outside Docker with the `local-docker` profile (for example, from IntelliJ), comment out that default broker command and switch to the commented `broker.conf`-based broker command and volume mount in `compose.yaml`, then recreate the broker container.
 
 Useful URLs:
 
@@ -345,21 +346,22 @@ See [`QUALITY.md`](QUALITY.md) for the detailed build gates, workflow triggers, 
 
 The current implementation intentionally stops at a pragmatic assignment-ready design. The items below are **future directions**, not part of the current delivered behavior.
 
-- strengthen idempotency beyond the current `eventId`-only dedup key, especially if upstream producers can resend semantically different payloads with the same business identity
-- replace the current transaction-plus-audit pattern with a fuller outbox-style reliability design if stronger delivery guarantees become a production requirement
-- formalize outbound timeout, cancellation, and retry policies rather than relying on the current manual replay path for recovery
-- add automated retry-with-backoff orchestration and a DLQ strategy only when operational requirements justify the extra moving parts
-- review Kafka partitioning, consumer concurrency, and RocketMQ throughput settings for higher event volumes or wider tenant/event fan-out
-- introduce stronger operational alerting around repeated publish failures, replay backlogs, and unusual no-match/duplicate-event rates
-- harden persistence for production workloads by moving from in-memory H2 to a durable database and by reviewing retention/archival rules for settlement-audit data
-- expand runtime hardening with stricter secret management, environment-specific access controls, and richer deployment health/readiness checks
+- move from process-local in-memory H2 to a shared durable database for any serious load or multi-instance deployment
+- evolve the current transaction-plus-audit flow toward chunked preparation plus a worker-safe outbox/dispatch model when stronger throughput and delivery guarantees are required
+- replace manual replay semantics with claim/lease-based retry orchestration, bounded backoff, and optional DLQ handling for scaled operation
+- tune for sustained load explicitly: connection pooling, transaction timeouts, batching behavior, Kafka partitioning, and consumer/publisher concurrency
+- add retention, archival, and operational telemetry around dedup state, settlement history, retry backlog, and hot-path transaction cost
+- see [`DB_SCALING_REVIEW.md`](DB_SCALING_REVIEW.md) for the detailed persistence and scaling analysis
 
 ## Known limitations
 
-- deduplication is basic and keyed by `eventId`
-- DB writes and outbound publication are not a full transactional outbox
-- failed outbound dispatch can be retried manually in local/test profiles, but there is still no automatic replay worker
-- H2 is in-memory and resets on application restart
+- deduplication is basic and keyed only by `eventId`
+- database state is process-local in-memory H2, so dedup, audit history, and retry state are not shared across application instances
+- settlement preparation and follow-up audit updates are still oriented toward modest event fan-out rather than high-volume chunked dispatch
+- failed outbound dispatch can be retried manually in local/test profiles, but there is no worker-safe automated retry flow
+- database writes and outbound publication are not coordinated through a full transactional outbox
+- all in-memory persistence state resets on application restart
+- see [`DB_SCALING_REVIEW.md`](DB_SCALING_REVIEW.md) for the detailed database limitations and scaling implications
 
 ## Troubleshooting
 
