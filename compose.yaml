@@ -95,12 +95,16 @@ services:
     # from the IDE), comment out the default command above, uncomment the volume below, and
     # uncomment the host-first command below so RocketMQ advertises the host-reachable broker
     # address from `config/rocketmq/broker.conf`.
-    # volumes:
-    #   - ./config/rocketmq/broker.conf:/home/rocketmq/rocketmq-5.4.0/conf/broker.conf:ro
-    # command: >-
-    #   sh mqbroker -n rocketmq-namesrv:9876
-    #   -c /home/rocketmq/rocketmq-5.4.0/conf/broker.conf
-    #   --enable-proxy
+    # Windows local-dev mode: advertise the Windows host IPv4 from `config/rocketmq/broker.conf`
+    # so an IDE-run app on the host and Dockerized tooling such as RocketMQ Dashboard can both
+    # connect to the same broker through the published ports below. Update `brokerIP1` if the
+    # host IP changes.
+#    volumes:
+#       - ./config/rocketmq/broker.conf:/home/rocketmq/rocketmq-5.4.0/conf/broker.conf:ro
+#    command: >-
+#       sh mqbroker -n rocketmq-namesrv:9876
+#       -c /home/rocketmq/rocketmq-5.4.0/conf/broker.conf
+#       --enable-proxy
     environment:
       NAMESRV_ADDR: rocketmq-namesrv:9876
     ports:
