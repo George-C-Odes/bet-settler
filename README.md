@@ -159,7 +159,7 @@ What you get in this mode:
 
 This profile intentionally requests RocketMQ mode, so the application fails fast during startup if the RocketMQ transport bean cannot be created.
 
-> Important: the default `rocketmq-broker` command in `compose.yaml` is intentionally Docker-first so the `bet-settler` app container can publish through RocketMQ. If you want to run the app outside Docker with the `local-docker` profile (for example, from IntelliJ), comment out that default broker command and switch to the commented `broker.conf`-based broker command and volume mount in `compose.yaml`, then recreate the broker container.
+> Important: the default `rocketmq-broker` command in `compose.yaml` is intentionally Docker-first so the `bet-settler` app container can publish through RocketMQ. If you want to run the app outside Docker with the `local-docker` profile (for example, from IntelliJ on Windows), use the `broker.conf`-based broker command and volume mount in `compose.yaml`, and set `brokerIP1` in `config/rocketmq/broker.conf` to your current Windows host IPv4 before recreating the broker container.
 
 Useful URLs:
 
