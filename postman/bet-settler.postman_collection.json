@@ -1,0 +1,562 @@
+{
+  "info": {
+    "_postman_id": "b9f8c70b-f645-4201-b89f-cc4617c843a1",
+    "name": "bet-settler",
+    "description": "Postman collection for the bet-settler Spring Boot service. Covers the documented REST API, profile-gated demo helper endpoints, and actuator health/info/metrics endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "eventId",
+      "value": "EVT-1001",
+      "type": "string"
+    },
+    {
+      "key": "eventWithoutBetsId",
+      "value": "EVT-9999",
+      "type": "string"
+    },
+    {
+      "key": "eventName",
+      "value": "Team A vs Team B",
+      "type": "string"
+    },
+    {
+      "key": "eventWinnerId",
+      "value": "TEAM-A",
+      "type": "string"
+    },
+    {
+      "key": "metricName",
+      "value": "betsettler.event.outcomes.accepted",
+      "type": "string"
+    },
+    {
+      "key": "metricAccepted",
+      "value": "betsettler.event.outcomes.accepted",
+      "type": "string"
+    },
+    {
+      "key": "metricProcessed",
+      "value": "betsettler.event.outcomes.processed",
+      "type": "string"
+    },
+    {
+      "key": "metricPrepared",
+      "value": "betsettler.settlements.prepared",
+      "type": "string"
+    },
+    {
+      "key": "metricDispatched",
+      "value": "betsettler.settlements.dispatched",
+      "type": "string"
+    },
+    {
+      "key": "metricResetInvocations",
+      "value": "betsettler.demo.reset.invocations",
+      "type": "string"
+    },
+    {
+      "key": "metricResetRowsCleared",
+      "value": "betsettler.demo.reset.rows.cleared",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "REST API",
+      "description": "Application API endpoints documented in the README and controller mappings.",
+      "item": [
+        {
+          "name": "Publish event outcome",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{eventId}}\",\n  \"eventName\": \"{{eventName}}\",\n  \"eventWinnerId\": \"{{eventWinnerId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/event-outcomes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "event-outcomes"
+              ]
+            },
+            "description": "Publishes a sports event outcome for asynchronous processing. The service waits briefly for Kafka acknowledgement before returning 202 Accepted."
+          },
+          "response": []
+        },
+        {
+          "name": "Get all bets",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bets"
+              ]
+            },
+            "description": "Returns the Flyway-seeded bet data."
+          },
+          "response": []
+        },
+        {
+          "name": "Get bets by eventId",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bets?eventId={{eventId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bets"
+              ],
+              "query": [
+                {
+                  "key": "eventId",
+                  "value": "{{eventId}}"
+                }
+              ]
+            },
+            "description": "Returns only bets linked to the supplied event identifier."
+          },
+          "response": []
+        },
+        {
+          "name": "Get bets for event with no seeded matches",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bets?eventId={{eventWithoutBetsId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bets"
+              ],
+              "query": [
+                {
+                  "key": "eventId",
+                  "value": "{{eventWithoutBetsId}}"
+                }
+              ]
+            },
+            "description": "Useful for exercising the no-match path documented in the README using EVT-9999."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Demo helpers",
+      "description": "These endpoints are only available when the application runs with the local-docker, local-fallback, or test profile.",
+      "item": [
+        {
+          "name": "Reset demo state",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/internal/demo/reset",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "internal",
+                "demo",
+                "reset"
+              ]
+            },
+            "description": "Clears transient processing state while preserving the seeded bets. Returns 404 when demo profiles are inactive."
+          },
+          "response": []
+        },
+        {
+          "name": "Retry settlements",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/internal/demo/retry-settlements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "internal",
+                "demo",
+                "retry-settlements"
+              ]
+            },
+            "description": "Replays settlement audit rows that remain PENDING or FAILED through the currently configured settlement transport."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Actuator",
+      "description": "Actuator endpoints exposed by the current application configuration. Health details are enabled, and liveness/readiness probes are available.",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            },
+            "description": "Primary healthcheck endpoint. The application configuration enables health details."
+          },
+          "response": []
+        },
+        {
+          "name": "Health - liveness",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health/liveness",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health",
+                "liveness"
+              ]
+            },
+            "description": "Liveness probe endpoint enabled through management.endpoint.health.probes.enabled=true."
+          },
+          "response": []
+        },
+        {
+          "name": "Health - readiness",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health/readiness",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health",
+                "readiness"
+              ]
+            },
+            "description": "Readiness probe endpoint enabled through management.endpoint.health.probes.enabled=true."
+          },
+          "response": []
+        },
+        {
+          "name": "Info",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/info",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "info"
+              ]
+            },
+            "description": "Returns application metadata such as the active profiles and messaging configuration."
+          },
+          "response": []
+        },
+        {
+          "name": "Metrics index",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/metrics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "metrics"
+              ]
+            },
+            "description": "Lists all available Micrometer metric names, including the custom bet-settler settlement-flow meters."
+          },
+          "response": []
+        },
+        {
+          "name": "Metric by name",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/metrics/{{metricName}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "metrics",
+                "{{metricName}}"
+              ]
+            },
+            "description": "Generic metric lookup. Change the metricName collection variable to inspect a different Micrometer metric."
+          },
+          "response": []
+        },
+        {
+          "name": "Metric - event outcomes accepted",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/metrics/{{metricAccepted}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "metrics",
+                "{{metricAccepted}}"
+              ]
+            },
+            "description": "Custom meter for accepted event outcome publishes."
+          },
+          "response": []
+        },
+        {
+          "name": "Metric - event outcomes processed",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/metrics/{{metricProcessed}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "metrics",
+                "{{metricProcessed}}"
+              ]
+            },
+            "description": "Custom meter for processed event outcomes."
+          },
+          "response": []
+        },
+        {
+          "name": "Metric - settlements prepared",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/metrics/{{metricPrepared}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "metrics",
+                "{{metricPrepared}}"
+              ]
+            },
+            "description": "Custom meter for settlement preparation volume."
+          },
+          "response": []
+        },
+        {
+          "name": "Metric - settlements dispatched",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/metrics/{{metricDispatched}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "metrics",
+                "{{metricDispatched}}"
+              ]
+            },
+            "description": "Custom meter for successful settlement dispatch attempts."
+          },
+          "response": []
+        },
+        {
+          "name": "Metric - demo reset invocations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/metrics/{{metricResetInvocations}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "metrics",
+                "{{metricResetInvocations}}"
+              ]
+            },
+            "description": "Custom meter for demo reset endpoint calls."
+          },
+          "response": []
+        },
+        {
+          "name": "Metric - demo reset rows cleared",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/metrics/{{metricResetRowsCleared}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "metrics",
+                "{{metricResetRowsCleared}}"
+              ]
+            },
+            "description": "Custom meter that tracks the number of rows cleared by demo resets."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
+
