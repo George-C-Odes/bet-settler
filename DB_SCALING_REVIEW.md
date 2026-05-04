@@ -1,4 +1,4 @@
-# Database review: high load and horizontal-scaling readiness
+# Database review: high-load and horizontal-scaling readiness
 
 ## Scope
 
@@ -31,7 +31,7 @@ The main reasons are:
    - For events with many matching bets, transaction time, memory usage, and connection occupancy all scale linearly.
    - After preparation, each settlement generates its own status update writing, which becomes expensive at volume.
 
-3. **The retry flow is not work-claim-based**.
+3. **The retry flow is not claim/lease-based**.
    - It reads all retryable rows at once.
    - It does not lease or claim rows for one worker/node.
    - In a scaled deployment, multiple nodes could replay the same rows.
@@ -40,6 +40,10 @@ The main reasons are:
    - There is no partitioning, retention, archival, or bounded replay window.
    - Queries are unpaged and entity-based.
    - Pooling and batching are left using defaults.
+
+5. **Kafka-driven parallelism and replay behavior are not yet treated as part of the DB scaling model**.
+   - Consumer processing should be assumed to be at-least-once and therefore idempotent under redelivery.
+   - Kafka partition count, key choice, and consumer concurrency directly shape how much concurrent DB work the service creates.
 
 That said, the implementation already has some good foundations:
 
@@ -69,10 +73,11 @@ A practical next-step design could be:
     - claim outbox rows in limited batches
     - publish to RocketMQ
     - update state with compare-and-swap semantics
-6. Move long-term history into:
+6. Keep consumer processing idempotent under Kafka redelivery and preserve per-event ordering with a stable `eventId` message key.
+7. Move long-term history into:
     - archived audit table, or
     - partitioned history table
-7. Keep the current `settlement_audit` shape only as a history/reporting concern, not as the hot dispatch queue
+8. Keep the current `settlement_audit` shape only as a history/reporting concern, not as the hot dispatch queue
 
 This preserves the current clean separation of responsibilities while making the persistence model much more scale-friendly.
 
@@ -88,17 +93,19 @@ The current implementation is **well-designed for the assignment’s runtime sim
 - integrity constraints
 - clear persistence adapters
 
-However, for **high load** and especially **horizontal scaling**, the biggest gaps are structural rather than cosmetic:
+However, for **high-load operation** and especially **horizontal scaling**, the biggest gaps are structural rather than cosmetic:
 
 - the service needs a **shared durable database**
 - the event flow needs **chunking/batching**
+- consumer processing needs **idempotency under Kafka redelivery**
+- Kafka partitioning and consumer concurrency need to be **tuned together with DB capacity**
 - the retry path needs **claim/lease semantics**
 - the audit model needs **lifecycle management**
 - pooling, batching, and transaction settings need to become explicit
 
 If I had to summarize it in one line:
 
-> The current DB layer is strong for a demo and correctness-focused assignment, but it must evolve from a process-local audit log into a shared, chunked, worker-safe persistence model before it can handle serious throughput or scale-out safely.
+> The current DB layer is strong for a demo and correctness-focused assignment, but it must evolve from a process-local audit log into a shared, chunked, worker-safe persistence model before it can handle serious throughput or horizontal scaling safely.
 
 ---
 
@@ -126,7 +133,7 @@ It matches the task requirement to use an in-memory database for bets and keeps 
 
 ### Why this is a hard blocker for scale
 
-For high load and horizontal scaling, the current setup has these structural limits:
+For high-load operation and horizontal scaling, the current setup has these structural limits:
 
 - **No shared state across instances**
   - node A and node B will each have different `processed_event_outcome` rows
@@ -215,6 +222,7 @@ That is a good pattern.
 If this table remains the dedup store in a shared database:
 
 - keep the primary-key dedup model
+- treat it as part of the consumer idempotency boundary, so it must live in a shared durable database rather than process-local H2
 - add a retention policy based on the business replay horizon
 - add cleanup support, likely including an index on `processed_at`
 - define whether dedup is forever, time-bounded, or event-version aware
@@ -351,6 +359,12 @@ If one event matches thousands of bets, the code prepares all rows first and the
 
 Large events could keep a transaction open for too long under contention or slow I/O around commit pressure.
 
+#### E. Kafka parallelism is not yet aligned with DB capacity
+
+Kafka partition count, message-key choice, and consumer concurrency determine how many event-processing transactions can hit the database in parallel.
+
+If ordering per event matters, the system should keep using a stable `eventId` key, but high-fan-out events can still create hot partitions and bursty DB pressure.
+
 ### Recommendation
 
 For a higher scale, change the event flow from “whole event in one unit” to “event in chunks”:
@@ -365,6 +379,8 @@ Concretely:
 - replace `findByEventIdOrderByBetIdAsc(...)` with chunked/keyset reads
 - batch-write outbox/dispatch rows in the same transaction as dedup preparation
 - move `SENT` / `FAILED` updates to worker-side batched transitions
+- keep consumer processing idempotent for at-least-once Kafka delivery and validate whether `eventId` alone is the right dedup key long term
+- size Kafka partitions and consumer concurrency together with DB pool size, transaction duration, and expected event fan-out
 - set transaction timeouts explicitly
 
 This is the path that scales both vertically and horizontally.
@@ -630,8 +646,10 @@ Minimum viable changes:
 
 - move to a shared durable RDBMS
 - keep insert-first dedup in that shared DB
+- keep consumer processing idempotent under Kafka redelivery
 - introduce worker-safe retry claiming
 - page/chunk large bet sets
+- align Kafka partition count and consumer concurrency with the database capacity of the shared runtime
 - add pool and timeout tuning
 
 Recommended stronger design:
@@ -674,20 +692,28 @@ Why first:
 
 ## P1 - high-value throughput improvements
 
-### 4. Add explicit pooling and transaction timeout tuning
+### 4. Align Kafka partition strategy, stable message keys, and consumer concurrency with DB capacity
+
+Why:
+
+- partition count controls how much parallel work can reach the database
+- stable `eventId` keys preserve per-event ordering, but hot events can still create skew
+- DB sizing, consumer concurrency, and event fan-out need to be tuned together rather than independently
+
+### 5. Add explicit pooling and transaction timeout tuning
 
 Why:
 
 - default settings are rarely right for a sustained load
 
-### 5. Make write batching real, not just API-level batching
+### 6. Make write batching real, not just API-level batching
 
 Why:
 
 - `saveAll(...)` alone is not sufficient evidence of efficient batch inserts
 - `IDENTITY` is a likely batching limiter
 
-### 6. Introduce retry scheduling columns and backoff semantics
+### 7. Introduce retry scheduling columns and backoff semantics
 
 Why:
 
@@ -697,7 +723,7 @@ Why:
 
 ## P2 - medium-term schema and lifecycle improvements
 
-### 7. Add retention/archival strategy
+### 8. Add retention/archival strategy
 
 Tables affected:
 
@@ -706,15 +732,15 @@ Tables affected:
 
 Why:
 
-- both will otherwise grow without a bound in a durable setup
+- both will otherwise grow without bound in a durable setup
 
-### 8. Separate hot dispatch state from cold audit history
+### 9. Separate hot dispatch state from cold audit history
 
 Why:
 
 - improves hot-path query performance and reduces operational table bloat
 
-### 9. Add pagination/projections for non-hot-path reads
+### 10. Add pagination/projections for non-hot-path reads
 
 Why:
 
@@ -724,7 +750,7 @@ Why:
 
 ## P3 – observability and verification improvements
 
-### 10. Add database-focused load and concurrency tests
+### 11. Add database-focused load and concurrency tests
 
 The current tests are good for correctness and schema integrity, but they do not prove scale behavior.
 
@@ -732,16 +758,18 @@ Add tests for:
 
 - concurrent duplicate processing of the same `eventId`
 - large fan-out event preparation
+- partition-skew scenarios and consumer parallelism against the shared database profile
 - multi-worker retry claiming
 - lock contention and transaction timeout behavior
 - batched insert/update effectiveness against the chosen production database
 
-### 11. Add DB operational telemetry
+### 12. Add DB operational telemetry
 
 Track at least:
 
 - connection-pool saturation
 - transaction duration for preparation
+- consumer lag and partition skew alongside database saturation indicators
 - rows inserted per event
 - rows updated per dispatch batch
 - retry backlog size
