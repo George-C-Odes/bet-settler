@@ -54,6 +54,54 @@ So the code is **directionally solid**, but the runtime database choice and hot-
 
 ---
 
+## Concrete target design for a scalable version
+
+A practical next-step design could be:
+
+1. **Shared PostgreSQL database**
+2. `processed_event_outcome` remains the dedup table
+3. Replace direct pending-audit writes on the hot path with a dedicated `settlement_outbox` table
+4. In the same transaction:
+    - insert dedup row
+    - read matching bets in chunks
+    - insert outbox rows in chunks
+5. Separate dispatcher workers:
+    - claim outbox rows in limited batches
+    - publish to RocketMQ
+    - update state with compare-and-swap semantics
+6. Move long-term history into:
+    - archived audit table, or
+    - partitioned history table
+7. Keep the current `settlement_audit` shape only as a history/reporting concern, not as the hot dispatch queue
+
+This preserves the current clean separation of responsibilities while making the persistence model much more scale-friendly.
+
+---
+
+## Final assessment
+
+The current implementation is **well-designed for the assignment’s runtime simplicity**, and several persistence choices are already sensible:
+
+- dedup by insert-first unique key
+- event-indexed bet lookup
+- direct audit status updates
+- integrity constraints
+- clear persistence adapters
+
+However, for **high load** and especially **horizontal scaling**, the biggest gaps are structural rather than cosmetic:
+
+- the service needs a **shared durable database**
+- the event flow needs **chunking/batching**
+- the retry path needs **claim/lease semantics**
+- the audit model needs **lifecycle management**
+- pooling, batching, and transaction settings need to become explicit
+
+If I had to summarize it in one line:
+
+> The current DB layer is strong for a demo and correctness-focused assignment, but it must evolve from a process-local audit log into a shared, chunked, worker-safe persistence model before it can handle serious throughput or scale-out safely.
+
+---
+
 ## Current database setup
 
 ### What exists today
@@ -701,49 +749,3 @@ Track at least:
 - dead-letter counts
 
 ---
-
-## Concrete target design for a scalable version
-
-A practical next-step design could be:
-
-1. **Shared PostgreSQL database**
-2. `processed_event_outcome` remains the dedup table
-3. Replace direct pending-audit writes on the hot path with a dedicated `settlement_outbox` table
-4. In the same transaction:
-   - insert dedup row
-   - read matching bets in chunks
-   - insert outbox rows in chunks
-5. Separate dispatcher workers:
-   - claim outbox rows in limited batches
-   - publish to RocketMQ
-   - update state with compare-and-swap semantics
-6. Move long-term history into:
-   - archived audit table, or
-   - partitioned history table
-7. Keep the current `settlement_audit` shape only as a history/reporting concern, not as the hot dispatch queue
-
-This preserves the current clean separation of responsibilities while making the persistence model much more scale-friendly.
-
----
-
-## Final assessment
-
-The current implementation is **well-designed for the assignment’s runtime simplicity**, and several persistence choices are already sensible:
-
-- dedup by insert-first unique key
-- event-indexed bet lookup
-- direct audit status updates
-- integrity constraints
-- clear persistence adapters
-
-However, for **high load** and especially **horizontal scaling**, the biggest gaps are structural rather than cosmetic:
-
-- the service needs a **shared durable database**
-- the event flow needs **chunking/batching**
-- the retry path needs **claim/lease semantics**
-- the audit model needs **lifecycle management**
-- pooling, batching, and transaction settings need to become explicit
-
-If I had to summarize it in one line:
-
-> The current DB layer is strong for a demo and correctness-focused assignment, but it must evolve from a process-local audit log into a shared, chunked, worker-safe persistence model before it can handle serious throughput or scale-out safely.
