@@ -366,13 +366,13 @@ The current implementation intentionally stops at a pragmatic assignment-ready d
 
 ## Trade-offs made from a task timing / simplicity perspective
 
-- prioritized a clean, fully runnable end-to-end flow over production-grade scalability so the assignment requirements could be demonstrated clearly within the expected 90-minute window
-- used in-memory H2 because it matched the exercise constraints and kept local setup, review, and repeatable execution simple, at the cost of durability and shared multi-instance state
-- kept the persistence flow explicit and easy to follow — dedup record, bet lookup, audit write, publish, status update — instead of adding a more complex outbox/worker architecture
-- favored whole-event preparation for modest demo data rather than chunked processing, aggressive batching, and advanced backpressure controls, which would add significant design and implementation overhead
+- prioritized a clean, fully runnable end-to-end flow over production-grade **scalability** so the assignment requirements could be demonstrated clearly within the expected 90-minute window
+- used in-memory H2 because it matched the exercise constraints and kept local setup, review, and repeatable execution simple, at the cost of **durability** and shared **multi-instance** state
+- kept the persistence flow explicit and easy to follow — dedup record, bet lookup, audit write, publish, status update — instead of adding a more complex **outbox/worker architecture**
+- favored whole-event preparation for modest demo data rather than **chunked processing**, aggressive **batching**, and advanced backpressure controls, which would add significant design and implementation overhead
 - supported a logging fallback for settlement publication so the core integration boundaries could still be exercised even when RocketMQ transport wiring was unavailable
-- implemented a simple manual retry path for demo and test use instead of claim/lease-based automated retry orchestration, which is safer for scaled multi-node operation but substantially more involved
-- focused time on correctness, readability, separation of concerns, and assignment executability rather than on production tuning such as pool sizing, transaction timeouts, retention, archival, and throughput optimization
+- implemented a simple manual retry path for demo and test use instead of **claim/lease-based automated retry** orchestration, which is safer for scaled multi-node operation but substantially more involved
+- focused time on correctness, readability, separation of concerns, quality gates / code coverage and assignment executability rather than on production tuning such as **pool sizing, transaction timeouts, retention, archival, and throughput optimization**
 - documented the main scaling gaps explicitly in [`DB_SCALING_REVIEW.md`](DB_SCALING_REVIEW.md), making the current design trade-offs intentional and transparent rather than accidental
 
 ## Troubleshooting
